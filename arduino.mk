@@ -225,7 +225,11 @@ readpreferencesparam = $(shell sed -ne "s/$(1)=\(.*\)/\1/p" $(PREFERENCESFILE))
 SKETCHBOOKDIR := $(call readpreferencesparam,sketchbook.path)
 endif
 
-# invalid board?
+ifeq "$(BOARD)" "nano" # afiskon: dirty hack
+BOARD_BUILD_MCU := 'atmega328p'
+BOARD_UPLOAD_SPEED := 57600
+endif
+
 ifeq "$(BOARD_BUILD_MCU)" ""
 ifneq "$(MAKECMDGOALS)" "boards"
 ifneq "$(MAKECMDGOALS)" "clean"
@@ -294,7 +298,7 @@ endif
 
 # flags
 CPPFLAGS += -Os -Wall -fno-exceptions -ffunction-sections -fdata-sections
-CPPFLAGS += -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
+CPPFLAGS += -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -fno-threadsafe-statics
 CPPFLAGS += -mmcu=$(BOARD_BUILD_MCU)
 CPPFLAGS += -DF_CPU=$(BOARD_BUILD_FCPU) -DARDUINO=$(ARDUINOCONST)
 CPPFLAGS += -DUSB_VID=$(BOARD_USB_VID) -DUSB_PID=$(BOARD_USB_PID)
@@ -339,12 +343,14 @@ upload: target
 	@test 0 -eq $(SERIALDEVGUESS) || { \
 		echo "*GUESSING* at serial device:" $(SERIALDEV); \
 		echo; }
-ifeq "$(BOARD_BOOTLOADER_PATH)" "caterina"
+
+# kick the chip into the bootloader, especially required for Leonardo
+# see https://nicholaskell.wordpress.com/tag/leonardo/
+
 	stty $(STTYFARG) $(SERIALDEV) speed 1200
-	sleep 1
-else
 	stty $(STTYFARG) $(SERIALDEV) hupcl
-endif
+	sleep 2
+
 	$(AVRDUDE) $(AVRDUDEFLAGS) -U flash:w:$(TARGET).hex:i
 
 clean:
